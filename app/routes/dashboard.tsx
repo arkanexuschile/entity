@@ -33,11 +33,15 @@ export async function loader({ request }: Route.LoaderArgs) {
       modulosActivos,
       modulosPendientes,
     },
+    integrations: {
+      shopify: !!process.env.SHOPIFY_SHOP_DOMAIN,
+      googleSheets: !!process.env.GOOGLE_SHEET_ID,
+    },
   };
 }
 
 export default function Dashboard() {
-  const { user, stats } = useLoaderData<typeof loader>();
+  const { user, stats, integrations } = useLoaderData<typeof loader>();
 
   return (
     <div className="space-y-6">
@@ -122,14 +126,14 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-[10px] text-gray-500 uppercase">Shopify</p>
-              <p className="text-xs text-gray-500 font-medium mt-1">
-                {process.env.SHOPIFY_SHOP_DOMAIN ? "Configurado" : "Sin configurar"}
+              <p className={`text-xs font-medium mt-1 ${integrations.shopify ? "text-green-400" : "text-gray-500"}`}>
+                {integrations.shopify ? "Configurado" : "Sin configurar"}
               </p>
             </div>
             <div>
               <p className="text-[10px] text-gray-500 uppercase">Google Sheets</p>
-              <p className="text-xs text-gray-500 font-medium mt-1">
-                {process.env.GOOGLE_SHEET_ID ? "Configurado" : "Sin configurar"}
+              <p className={`text-xs font-medium mt-1 ${integrations.googleSheets ? "text-green-400" : "text-gray-500"}`}>
+                {integrations.googleSheets ? "Configurado" : "Sin configurar"}
               </p>
             </div>
           </div>
