@@ -28,7 +28,7 @@ export const modules: ModuleDef[] = [
     prefijoTag: "",
     prefijoRuta: "",
     estado: "activo",
-    credenciales: ["Google OAuth", "Google Service Account"],
+    credenciales: ["Google Service Account (Sheets)"],
   },
   {
     slug: "finanzas",

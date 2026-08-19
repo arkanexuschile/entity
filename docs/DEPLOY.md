@@ -46,9 +46,9 @@ DATABASE_URL=file:./data/entity.db
 # Sesión
 SESSION_SECRET=<generar string aleatorio largo>
 
-# Google OAuth (login de usuarios)
-GOOGLE_CLIENT_ID=<de Google Cloud Console>
-GOOGLE_CLIENT_SECRET=<de Google Cloud Console>
+# Google OAuth (login de usuarios) — OPCIONAL, solo si se activa
+# GOOGLE_CLIENT_ID=<de Google Cloud Console>
+# GOOGLE_CLIENT_SECRET=<de Google Cloud Console>
 
 # Google Sheets (cuenta de servicio, lectura del Sheet)
 GOOGLE_SHEET_ID=<ID del Sheet>
@@ -153,8 +153,10 @@ Entity necesita una **custom app** en el admin de la tienda para acceder a la Ad
 3. Generar clave JSON
 4. Compartir el Google Sheet con el email de la cuenta de servicio (acceso lector)
 
-### OAuth (login de usuarios)
+### OAuth (login de usuarios) — OPCIONAL
 1. Google Cloud Console → APIs & Services → Credentials
 2. Crear OAuth 2.0 Client ID (Web application)
 3. Agregar URI de redirección: `https://entity.piedrabruja.cl/api/auth/callback`
 4. Copiar Client ID y Client Secret al `.env`
+
+**Nota:** por ahora se usa login con usuario + contraseña (más simple). Google OAuth se puede activar más adelante si se necesita.

@@ -40,7 +40,7 @@ Cada módulo edita **solo su archivo** y agrega su re-export al barrel.
 
 ### 3.3 Autenticación
 
-Google OAuth (mismo proyecto Cloud que la cuenta de servicio de Sheets). Sesión con `SESSION_SECRET`. Roles: owner, admin, miembro. Permisos por módulo.
+Usuario + contraseña (hash bcrypt). Roles: owner, admin, miembro. Permisos por módulo. Google OAuth queda como opción futura si se necesita.
 
 ## 4. Módulos del roadmap
 
@@ -75,7 +75,7 @@ Ver `docs/PROMPT-COORDINACION.md` para el prompt de arranque obligatorio.
 
 | Módulo | Rama | Dueño | Prefijo tabla | Prefijo tag | Tablas | Rutas | Credenciales |
 |--------|------|-------|---------------|-------------|--------|-------|--------------|
-| Main | main | Noe | (infra) | — | users, roles, jobs, sync_* | /, /login, /api/* | Google OAuth, Google Service Account |
+| Main | main | Noe | (infra) | — | users, roles, jobs, sync_* | /, /login, /api/* | Google Service Account (Sheets) |
 | Finanzas | main | Germán | (sin prefijo) | un: | entries, tracker_*, proveedores, *_detalle, exception_queue | /finanzas/* | Google Sheet (lectura) |
 | ABC | abc | Germán | abc_ | abc: | — | /abc/* | Shopify Admin API |
 
