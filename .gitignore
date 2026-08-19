@@ -1,0 +1,10 @@
+.DS_Store
+.env
+/node_modules/
+
+# React Router
+/.react-router/
+/build/
+
+# Base de datos local (nunca versionar el archivo de datos)
+/data/
