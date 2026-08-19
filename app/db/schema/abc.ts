@@ -9,3 +9,5 @@
 // - abc_product_scores (puntaje por producto)
 // - abc_thresholds (intervalos de corte A/B/C, configurables)
 // - abc_type_config (types de Shopify usados en el cálculo)
+
+export {};

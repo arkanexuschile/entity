@@ -7,3 +7,5 @@
 // - users (Fase E: autenticación)
 // - roles (Fase E: permisos por módulo)
 // - jobs (Fase G: scheduler)
+
+export {};
