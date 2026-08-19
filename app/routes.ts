@@ -13,5 +13,6 @@ export default [
     route("finanzas", "routes/finanzas.tsx"),
     route("abc", "routes/abc.tsx"),
     route("shopify-test", "routes/shopify-test.tsx"),
+    route("jobs", "routes/jobs.tsx"),
   ]),
 ] satisfies RouteConfig;
