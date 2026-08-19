@@ -1,9 +1,13 @@
-import { NavLink, Outlet, useLoaderData } from "react-router";
+import { NavLink, Outlet, useLoaderData, redirect } from "react-router";
 import { modules } from "~/modules/registry";
-import { getUser } from "~/lib/auth.server";
+import { getUser, getUserId } from "~/lib/auth.server";
 import type { Route } from "./+types/AppLayout";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const userId = await getUserId(request);
+  if (!userId) {
+    throw redirect("/login");
+  }
   const user = await getUser(request);
   return { user };
 }
