@@ -17,6 +17,7 @@
   "dependencies": {
     "@react-router/node": "^8",
     "@react-router/serve": "^8",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
     "googleapis": "^174.0.1",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@react-router/dev": "^8",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22",
     "@types/react": "^19.2.14",

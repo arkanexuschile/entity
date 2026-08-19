@@ -7,9 +7,42 @@
 
 html,
 body {
-  @apply bg-white dark:bg-gray-950;
+  @apply bg-gray-950 text-gray-100;
 
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
   }
+}
+
+/* Scrollbar RPG */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+::-webkit-scrollbar-thumb {
+  background: #4a3f35;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6b5b4a;
+}
+
+/* Focus ring amber para inputs */
+input:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+  border-color: #d97706;
+}
+
+/* Botón primario amber */
+.btn-primary {
+  @apply bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 px-4 rounded transition-colors;
+}
+
+/* Card con borde sutil */
+.card-rpg {
+  @apply bg-gray-900 border border-gray-700 rounded-lg shadow-lg;
 }

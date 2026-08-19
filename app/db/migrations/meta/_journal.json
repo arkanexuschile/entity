@@ -22,6 +22,13 @@
       "when": 1786497678558,
       "tag": "0002_bitter_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787174398450,
+      "tag": "0003_watery_snowbird",
+      "breakpoints": true
     }
   ]
 }

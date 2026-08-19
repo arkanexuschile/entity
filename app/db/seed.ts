@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { trackerCategories } from "./schema";
+import { trackerCategories, users } from "./schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 /**
  * Semilla de tracker_categories a partir de la taxonomía observada en la
@@ -110,5 +112,23 @@ for (const raiz of TREE) {
 
 const count = db.select().from(trackerCategories).all().length;
 console.log(`Sembradas ${count} categorías (jerarquía reconstruida desde Flujo — revisar antes de usar en producción).`);
+
+// --- Usuario admin inicial ---
+const adminPasswordHash = bcrypt.hashSync("admin123", 10);
+const existingAdmin = db.select().from(users).where(
+  eq(users.username, "noe")
+).get();
+
+if (!existingAdmin) {
+  db.insert(users).values({
+    username: "noe",
+    passwordHash: adminPasswordHash,
+    nombre: "Noe",
+    role: "owner",
+  }).run();
+  console.log("Usuario admin creado: noe / admin123 (CAMBIAR EN PRODUCCIÓN)");
+} else {
+  console.log("Usuario 'noe' ya existe, no se recrea.");
+}
 
 sqlite.close();
