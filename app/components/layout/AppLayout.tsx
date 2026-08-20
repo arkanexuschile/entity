@@ -1,20 +1,29 @@
 import { NavLink, Outlet, useLoaderData, redirect } from "react-router";
 import { modules } from "~/modules/registry";
 import { getUser, getUserId } from "~/lib/auth.server";
+import {
+  ShieldIcon,
+  SwordIcon,
+  BagIcon,
+  ScalesIcon,
+  GemIcon,
+  FlameIcon,
+  ScrollIcon,
+  CompassIcon,
+  AnvilIcon,
+} from "~/components/icons";
 import type { Route } from "./+types/AppLayout";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const userId = await getUserId(request);
   if (!userId) {
-    throw redirect("/login");
+    const url = new URL(request.url);
+    const redirectTo = url.pathname + url.search;
+    throw redirect(`/login?redirectTo=${encodeURIComponent(redirectTo)}`);
   }
   const user = await getUser(request);
   return { user };
 }
-
-const modulosActivos = modules.filter(
-  (m) => m.estado === "activo" || m.estado === "pendiente"
-);
 
 const roleLabels: Record<string, string> = {
   owner: "Owner",
@@ -22,105 +31,125 @@ const roleLabels: Record<string, string> = {
   miembro: "Miembro",
 };
 
+const moduleIcons: Record<string, (props: React.SVGProps<SVGSVGElement>) => React.JSX.Element> = {
+  main: ShieldIcon,
+  finanzas: ScalesIcon,
+  abc: GemIcon,
+  compras: BagIcon,
+  venta: SwordIcon,
+  estrategias: CompassIcon,
+  marketing: FlameIcon,
+  gestion: ScrollIcon,
+  licitaciones: AnvilIcon,
+  distribuidora: BagIcon,
+};
+
+const modulosVisibles = modules.filter(
+  (m) => m.slug !== "main" && (m.estado === "activo" || m.estado === "pendiente")
+);
+
 export default function AppLayout() {
   const { user } = useLoaderData<typeof loader>();
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-gray-900 border-r border-gray-700 min-h-screen flex flex-col shrink-0">
-        {/* Header RPG */}
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center gap-2">
-            <span className="text-amber-400 text-lg">&#9876;</span>
-            <div>
-              <h1 className="text-base font-bold text-gray-100 tracking-tight">
-                Entity
-              </h1>
-              <p className="text-[10px] text-gray-500">PiedraBruja</p>
-            </div>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="crest">
+          <div className="crest-shield">E</div>
+          <div>
+            <div className="crest-title">Entity</div>
+            <div className="crest-sub">PiedraBruja</div>
           </div>
         </div>
 
-        {/* Navegación */}
-        <nav className="flex-1 p-3 space-y-1">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors ${
-                isActive
-                  ? "bg-amber-600/20 text-amber-400 border border-amber-600/30 font-medium"
-                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
-              }`
-            }
-          >
-            <span className="text-xs">&#9733;</span>
-            Dashboard
-          </NavLink>
-
-          <div className="pt-3 pb-1 px-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-              Módulos
-            </p>
-          </div>
-
-          {modulosActivos.map((mod) => (
+        <div className="sidebar-label">Módulos</div>
+        <ul className="nav">
+          <li>
             <NavLink
-              key={mod.slug}
-              to={`/${mod.prefijoRuta || mod.slug}`}
+              to="/"
               end
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded text-sm transition-colors ${
-                  isActive
-                    ? "bg-amber-600/20 text-amber-400 border border-amber-600/30 font-medium"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                }`
-              }
+              className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
             >
-              <span className="text-xs opacity-60">&#9654;</span>
-              {mod.nombre}
+              <ShieldIcon />
+              <span>Salón del Gremio</span>
             </NavLink>
-          ))}
-        </nav>
+          </li>
 
-        {/* Usuario */}
-        <div className="p-3 border-t border-gray-700">
-          {user ? (
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-200 truncate">
-                  {user.nombre}
-                </p>
-                <p className="text-[10px] text-gray-500">
-                  {roleLabels[user.role] || user.role}
-                </p>
+          {modulosVisibles.map((mod) => {
+            const Icon = moduleIcons[mod.slug] ?? GemIcon;
+            return (
+              <li key={mod.slug}>
+                <div className="nav-link nav-link-locked" title="Próximamente">
+                  <Icon />
+                  <span>{mod.nombre}</span>
+                  {mod.estado === "pendiente" && (
+                    <span className="badge" style={{ marginLeft: "auto", fontSize: "0.6rem" }}>
+                      Pronto
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="sidebar-foot">
+          {user && (
+            <>
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  color: "var(--ink)",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {user.nombre}
               </div>
-              <form method="post" action="/logout">
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  color: "var(--faint)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <span className="badge" style={{ fontSize: "0.6rem", padding: "0.1rem 0.35rem" }}>
+                  {roleLabels[user.role] ?? user.role}
+                </span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{user.username}</span>
+              </div>
+              <form method="post" action="/logout" style={{ marginTop: "0.6rem" }}>
                 <button
                   type="submit"
-                  className="text-[10px] text-gray-500 hover:text-red-400 transition-colors px-2 py-1"
-                  title="Salir"
+                  style={{
+                    width: "100%",
+                    background: "rgba(232,199,118,0.12)",
+                    border: "1px solid rgba(232,199,118,0.25)",
+                    color: "var(--gold-soft)",
+                    borderRadius: 6,
+                    padding: "0.4rem",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    fontFamily: "var(--display)",
+                  }}
                 >
-                  &#10005;
+                  Salir
                 </button>
               </form>
-            </div>
-          ) : (
-            <NavLink
-              to="/login"
-              className="flex items-center gap-2 px-3 py-2 rounded text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-            >
-              <span className="text-xs">&#9654;</span>
-              Entrar
-            </NavLink>
+              <div className="realm-status" style={{ marginTop: "0.6rem" }}>
+                <span className="dot" />
+                <span>PiedraBruja · CLP</span>
+              </div>
+            </>
           )}
-          <p className="text-[10px] text-gray-600 mt-2 text-center">
-            v0.1.0
-          </p>
         </div>
       </aside>
 
-      <main className="flex-1 bg-gray-950 p-6 overflow-auto">
+      <main className="main">
         <Outlet />
       </main>
     </div>
