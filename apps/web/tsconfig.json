@@ -1,0 +1,13 @@
+{
+  "extends": "@entity/tsconfig/base.json",
+  "include": ["vite.config.ts", "react-router.config.ts", "app"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["@types/node", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./app/*"]
+    }
+  }
+}

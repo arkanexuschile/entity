@@ -1,72 +1,41 @@
-# Entity — PiedraBruja
+# Entity
 
-Plataforma central de conciliación bancaria, controlling de gastos, balances, flujo de caja y reportería de márgenes de PiedraBruja. Ver `docs/ARQUITECTURA.md` para el diseño completo — este README cubre solo lo operativo.
+ERP de PiedraBruja — ventas, compras, inventario, finanzas y operación del gremio.
 
-## Stack
+**Stack:** React Router v7 · React 19 · Vite · TypeScript · PostgreSQL 16 + Prisma · pnpm + Turborepo
 
-- React Router v8 en modo framework
-- Node 22 (LTS)
-- SQLite + Drizzle ORM
-- Tailwind CSS
-- TypeScript
+## Requisitos
 
-## Estado actual
+- Node 22
+- pnpm 11
+- Docker (para PostgreSQL local)
 
-- **Main (infraestructura):** esqueleto de la app, schema modular, registro de módulos, docs versionados.
-- **Finanzas (Fase 1):** modelo de datos completo (entries, trackers, exception_queue), sync con Google Sheets, motor de sugerencia de glosas. Sin UI todavía.
-- **ABC:** pendiente (adelanto de Fase 5 del roadmap).
-
-## Estructura del proyecto
-
-```
-app/
-├── db/
-│   ├── schema/          # Esquema modular por módulo
-│   │   ├── index.ts     # barrel (re-exporta todo)
-│   │   ├── main.ts      # tablas de infra (usuarios, roles, jobs)
-│   │   ├── finanzas.ts  # entries, trackers, exception_queue, sync
-│   │   └── abc.ts       # tablas ABC (placeholder)
-│   ├── migrations/
-│   ├── client.server.ts # cliente SQLite + Drizzle
-│   ├── migrate.ts       # runner de migraciones
-│   └── seed.ts          # semilla de categorías
-├── lib/                 # lógica compartida
-├── modules/
-│   └── registry.ts      # registro de módulos (fuente única de verdad)
-├── routes/              # rutas por módulo
-├── components/ui/       # primitivas UI compartidas
-├── root.tsx
-└── routes.ts
-docs/
-├── ARQUITECTURA.md      # diseño global, §11 registro de módulos
-├── PROMPT-COORDINACION.md  # plantilla de arranque para chats
-└── DEPLOY.md            # instructivo de despliegue al Droplet
-```
-
-## Desarrollo local
+## Puesta en marcha
 
 ```bash
-npm install
-cp .env.example .env   # completar credenciales
-npm run db:migrate
-npm run db:seed
-npm run dev
+docker compose up -d db        # levanta PostgreSQL en localhost:5435
+pnpm install
+pnpm --filter @entity/database db:generate
+pnpm --filter @entity/database db:migrate
+pnpm --filter @entity/database db:seed
+pnpm dev
 ```
 
-## Scripts
+App en `http://localhost:3000`.
 
-- `npm run dev` — servidor de desarrollo.
-- `npm run build` — build de producción.
-- `npm run start` — sirve el build de producción.
-- `npm run typecheck` — verifica tipos.
-- `npm run db:generate` — genera una migración nueva.
-- `npm run db:migrate` — aplica migraciones pendientes.
-- `npm run db:seed` — siembra/resetea categorías.
+**Demo:** `admin@entity.local` / `entity123`
 
-## Coordinación
+## Comandos útiles
 
-Ver `docs/PROMPT-COORDINACION.md` — cada chat nuevo de Claude arranca con ese prompt. Sin excepción.
+```bash
+pnpm dev                       # dev de la app
+pnpm typecheck                 # typecheck en todos los paquetes
+pnpm build                     # build de producción
+pnpm --filter @entity/database db:seed
+```
 
-## Despliegue
+## Estado
 
-Ver `docs/DEPLOY.md`. Solo Noe despliega, solo desde `main`.
+Solo el **dashboard** (Salón del Gremio) es navegable. Los demás módulos aparecen en el sidebar como items bloqueados hasta que se desarrollen.
+
+Documentación: `docs/` (arquitectura, deploy, prompt de coordinación).

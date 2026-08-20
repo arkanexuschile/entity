@@ -1,1 +1,0 @@
-ALTER TABLE `g66_detalle` ADD `nombre_tercero` text;

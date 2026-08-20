@@ -29,8 +29,9 @@ cd /var/www
 git clone https://github.com/arkanexuschile/entity.git
 cd entity
 
-# Instalar dependencias de producción
-npm ci --omit=dev
+# Instalar dependencias
+corepack enable
+pnpm install --frozen-lockfile
 
 # Configurar .env
 cp .env.example .env
@@ -40,24 +41,18 @@ cp .env.example .env
 ## 3. Variables de entorno
 
 ```bash
-# Base de datos
-DATABASE_URL=file:./data/entity.db
+# Base de datos PostgreSQL (dependencia: docker compose up -d db)
+DATABASE_URL=postgresql://entity:entity@localhost:5435/entity
 
 # Sesión
 SESSION_SECRET=<generar string aleatorio largo>
 
-# Google OAuth (login de usuarios) — OPCIONAL, solo si se activa
-# GOOGLE_CLIENT_ID=<de Google Cloud Console>
-# GOOGLE_CLIENT_SECRET=<de Google Cloud Console>
+# URL pública de la app (para enlaces en correos)
+APP_BASE_URL=https://entity.piedrabruja.cl
 
-# Google Sheets (cuenta de servicio, lectura del Sheet)
-GOOGLE_SHEET_ID=<ID del Sheet>
-GOOGLE_SERVICE_ACCOUNT_EMAIL=<email de la cuenta de servicio>
-GOOGLE_SERVICE_ACCOUNT_KEY=<clave privada, con \n literales>
-
-# Shopify (custom app de la tienda)
-SHOPIFY_SHOP_DOMAIN=<tienda.myshopify.com>
-SHOPIFY_ADMIN_TOKEN=<token de Admin API>
+# Resend (notificaciones por correo) — opcional
+RESEND_API_KEY=
+RESEND_FROM=Entity <noreply@entity.piedrabruja.cl>
 
 # Puerto
 PORT=3001
@@ -66,8 +61,9 @@ PORT=3001
 ## 4. Build y migraciones
 
 ```bash
-npm run build
-npm run db:migrate
+pnpm --filter @entity/database db:generate
+pnpm build
+pnpm --filter @entity/database db:deploy
 ```
 
 ## 5. Servicio systemd
@@ -116,21 +112,23 @@ Solo Noe, solo desde `main`:
 ```bash
 cd /var/www/entity
 git pull origin main
-npm ci --omit=dev
-npm run build
-npm run db:migrate
+pnpm install --frozen-lockfile
+pnpm --filter @entity/database db:generate
+pnpm build
+pnpm --filter @entity/database db:deploy
 sudo systemctl restart entity
 ```
 
 ## 8. Backup de la base de datos
 
-Cron job para respaldar `data/entity.db`:
+Cron job para respaldar PostgreSQL (via pg_dump):
 
 ```bash
-# Agregar a crontab
-0 2 * * * cp /var/www/entity/data/entity.db /var/backups/entity/entity-$(date +\%Y\%m\%d).db
+# Agregar a crontab (ajustar DATABASE_URL según .env)
+DATABASE_URL=postgresql://entity:entity@localhost:5435/entity
+0 2 * * * pg_dump --no-owner --no-privileges -f /var/backups/entity/entity-$(date +\%Y\%m\%d).sql "$DATABASE_URL"
 # Retener últimos 30 días
-0 3 * * * find /var/backups/entity -name "entity-*.db" -mtime +30 -delete
+0 3 * * * find /var/backups/entity -name "entity-*.sql" -mtime +30 -delete
 ```
 
 ## 9. Credenciales de Shopify (Custom App)
@@ -145,18 +143,12 @@ Entity necesita una **custom app** en el admin de la tienda para acceder a la Ad
 
 **Nota:** la custom app NO es una app pública. Es solo la forma que Shopify tiene de generar credenciales de API para una tienda.
 
-## 10. Credenciales de Google
+## 10. Login de usuarios
 
-### Cuenta de servicio (Google Sheets)
-1. Ir a Google Cloud Console → IAM → Service Accounts
-2. Crear cuenta de servicio "Entity Sheets Reader"
-3. Generar clave JSON
-4. Compartir el Google Sheet con el email de la cuenta de servicio (acceso lector)
+Se usa login por **email + contraseña** (bcrypt). Los usuarios se crean con el seed:
 
-### OAuth (login de usuarios) — OPCIONAL
-1. Google Cloud Console → APIs & Services → Credentials
-2. Crear OAuth 2.0 Client ID (Web application)
-3. Agregar URI de redirección: `https://entity.piedrabruja.cl/api/auth/callback`
-4. Copiar Client ID y Client Secret al `.env`
+```bash
+pnpm --filter @entity/database db:seed
+```
 
-**Nota:** por ahora se usa login con usuario + contraseña (más simple). Google OAuth se puede activar más adelante si se necesita.
+El seed crea la empresa `PiedraBruja SpA` y los usuarios de demo (`admin@entity.local` / `entity123`, `mille@entity.local`, etc.). En producción, reemplazar las contraseñas o crear los usuarios directamente en la base de datos.

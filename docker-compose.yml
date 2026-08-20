@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: entity-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: entity
+      POSTGRES_PASSWORD: entity
+      POSTGRES_DB: entity
+    ports:
+      - "5435:5432"
+    volumes:
+      - entity_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U entity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  entity_pgdata:

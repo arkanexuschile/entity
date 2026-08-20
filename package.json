@@ -1,44 +1,20 @@
 {
   "name": "entity",
   "private": true,
-  "type": "module",
-  "engines": {
-    "node": "22.x"
-  },
   "scripts": {
-    "build": "react-router build",
-    "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx app/db/migrate.ts",
-    "db:seed": "tsx app/db/seed.ts"
-  },
-  "dependencies": {
-    "@react-router/node": "^8",
-    "@react-router/serve": "^8",
-    "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
-    "drizzle-orm": "^0.45.2",
-    "googleapis": "^174.0.1",
-    "isbot": "^5.1.36",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "react-router": "^8"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @entity/database db:generate",
+    "db:migrate": "pnpm --filter @entity/database db:migrate",
+    "db:seed": "pnpm --filter @entity/database db:seed",
+    "db:studio": "pnpm --filter @entity/database db:studio"
   },
   "devDependencies": {
-    "@react-router/dev": "^8",
-    "@tailwindcss/vite": "^4.2.2",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^22",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "drizzle-kit": "^0.31.10",
-    "opencode-autoskills": "^1.2.0",
-    "tailwindcss": "^4.2.2",
-    "tsx": "^4.23.12",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.3"
-  }
+    "@esbuild/win32-x64": "0.28.2",
+    "turbo": "^2.5.0"
+  },
+  "packageManager": "pnpm@11.9.0"
 }

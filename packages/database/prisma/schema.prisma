@@ -1,0 +1,583 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// MODELO CONTABLE Y OPERATIVO — Blueprint basado en ERPNext
+// (1 sola empresa por ahora)
+// ============================================================
+
+enum RoleName {
+  ADMIN
+  MANAGER
+  FINANZAS
+  BODEGA
+  MARKETING
+  DISENO
+  VENTAS
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         RoleName  @default(VENTAS)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customers      Customer[]
+  suppliers      Supplier[]
+  salesInvoices  SalesInvoice[]
+  purchaseInvoices PurchaseInvoice[]
+  assignedTasks  Task[] @relation("TaskAssignee")
+  createdTasks   Task[] @relation("TaskCreator")
+  permissions    UserModulePermission[]
+  auditLogs      AuditLog[]
+
+  @@index([role])
+}
+
+// -------------------- Compañía --------------------
+
+model Company {
+  id         String @id @default(cuid())
+  name       String @unique
+  abbr       String
+  taxId      String? // RUT empresa
+  currency   String @default("CLP")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  defaultWarehouseId  String? @unique
+  defaultWarehouse    Warehouse? @relation("DefaultWarehouse", fields: [defaultWarehouseId], references: [id])
+  defaultIncomeAccountId  String? @unique
+  defaultIncomeAccount    Account? @relation("DefaultIncome", fields: [defaultIncomeAccountId], references: [id])
+  defaultExpenseAccountId String? @unique
+  defaultExpenseAccount   Account? @relation("DefaultExpense", fields: [defaultExpenseAccountId], references: [id])
+  defaultCashAccountId    String? @unique
+  defaultCashAccount      Account? @relation("DefaultCash", fields: [defaultCashAccountId], references: [id])
+  defaultVatAccountId     String? @unique
+  defaultVatAccount       Account? @relation("DefaultVat", fields: [defaultVatAccountId], references: [id])
+
+  warehouses       Warehouse[]
+  accounts         Account[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  items            Item[]
+  taxTemplates     TaxTemplate[]
+  salesInvoices    SalesInvoice[]
+  purchaseInvoices PurchaseInvoice[]
+  glEntries        GlEntry[]
+  stockLedgers     StockLedgerEntry[]
+}
+
+// -------------------- Bodega --------------------
+
+model Warehouse {
+  id        String  @id @default(cuid())
+  name      String
+  isGroup   Boolean @default(false)
+  parentId  String?
+  parent    Warehouse? @relation("WarehouseTree", fields: [parentId], references: [id])
+  children  Warehouse[] @relation("WarehouseTree")
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  defaultForCompany Company? @relation("DefaultWarehouse")
+  salesInvoices     SalesInvoice[]
+  purchaseInvoices  PurchaseInvoice[]
+  stockLedgers      StockLedgerEntry[]
+  salesItems        SalesInvoiceItem[]
+  purchaseItems     PurchaseInvoiceItem[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// -------------------- Catálogo / Ítems --------------------
+
+model Item {
+  id            String   @id @default(cuid())
+  itemCode      String
+  itemName      String
+  itemGroup     String? // grupo de ítem (Piedra, Accesorio, Servicio...)
+  uom           String   @default("unidad")
+  isStockItem   Boolean  @default(true)
+  isSalesItem   Boolean  @default(true)
+  isPurchaseItem Boolean @default(true)
+  barcode       String?
+  openingStock  Decimal  @default(0)
+  rate          Decimal? // precio compra / costo
+  standardRate  Decimal? // precio venta
+  valuationMethod String @default("FIFO")
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  salesItems   SalesInvoiceItem[]
+  purchaseItems PurchaseInvoiceItem[]
+  stockLedgers StockLedgerEntry[]
+  campaignItems CampaignItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, itemCode])
+  @@index([companyId])
+}
+
+// -------------------- Partes (Cliente / Proveedor) --------------------
+
+model Customer {
+  id           String  @id @default(cuid())
+  name         String // key interna (ej. CUST-00001)
+  customerName String
+  taxId        String? // RUT
+  email        String?
+  phone        String?
+  address      String?
+  currency     String  @default("CLP")
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdByUserId String?
+  createdBy       User?   @relation(fields: [createdByUserId], references: [id])
+
+  salesInvoices SalesInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, taxId])
+}
+
+model Supplier {
+  id          String  @id @default(cuid())
+  name        String // key interna (ej. SUP-00001)
+  supplierName String
+  taxId       String? // RUT
+  email       String?
+  phone       String?
+  address     String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdByUserId String?
+  createdBy       User?   @relation(fields: [createdByUserId], references: [id])
+
+  purchaseInvoices PurchaseInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, taxId])
+}
+
+// -------------------- Contabilidad --------------------
+
+enum RootType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum AccountType {
+  CASH
+  BANK
+  RECEIVABLE
+  PAYABLE
+  TAX
+  STOCK
+  FIXED_ASSET
+  EXPENSE
+  INCOME
+  EQUITY
+  OTHER
+}
+
+model Account {
+  id            String  @id @default(cuid())
+  name          String
+  accountNumber String?
+  parentId      String?
+  parent        Account? @relation("AccountTree", fields: [parentId], references: [id])
+  children      Account[] @relation("AccountTree")
+  accountType   AccountType @default(OTHER)
+  rootType      RootType
+  isGroup       Boolean @default(false)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  defaultIncomeFor   Company? @relation("DefaultIncome")
+  defaultExpenseFor  Company? @relation("DefaultExpense")
+  defaultCashFor     Company? @relation("DefaultCash")
+  defaultVatFor      Company? @relation("DefaultVat")
+
+  glEntries      GlEntry[]
+  taxTemplates   TaxTemplate[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId, rootType])
+}
+
+model TaxTemplate {
+  id        String  @id @default(cuid())
+  name      String
+  rate      Decimal @default(0) // 19 => IVA 19%
+  isVat     Boolean @default(true)
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  invoiceTaxes InvoiceTax[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+}
+
+// -------------------- Asientos (Partida doble) --------------------
+
+model GlEntry {
+  id          String   @id @default(cuid())
+  postingDate DateTime @default(now())
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  partyId     String? // Customer o Supplier (por nombre/key)
+  debit       Decimal  @default(0)
+  credit      Decimal  @default(0)
+  voucherType String // SalesInvoice, PurchaseInvoice, JournalEntry
+  voucherNo   String
+  isCancelled Boolean  @default(false)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+  @@index([companyId, voucherType, voucherNo])
+}
+
+// -------------------- Ventas --------------------
+
+enum CampaignChannel {
+  META
+  GOOGLE
+  SHOPIFY
+  EMAIL
+  ORGANIC
+  OTHER
+}
+
+model Campaign {
+  id          String          @id @default(cuid())
+  name        String
+  channel     CampaignChannel @default(OTHER)
+  startDate   DateTime
+  endDate     DateTime?
+  budget      Decimal         @default(0)
+  spend       Decimal         @default(0) // gasto real (ads) — Fase B integración
+  status      String          @default("Active") // Active | Paused | Ended
+  notes       String?
+
+  items    CampaignItem[]
+  metrics  CampaignMetric[]
+  invoices SalesInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channel])
+}
+
+model CampaignItem {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  itemId     String
+  item       Item     @relation(fields: [itemId], references: [id])
+
+  @@unique([campaignId, itemId])
+}
+
+model CampaignMetric {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  date       DateTime
+  source     String // Google, Meta, Email, Direct...
+  sessions   Int      @default(0)
+  addToCart  Int      @default(0)
+  checkouts  Int      @default(0)
+  purchases  Int      @default(0)
+  revenue    Decimal  @default(0)
+
+  @@unique([campaignId, date, source])
+  @@index([campaignId, date])
+}
+
+model IngestLog {
+  id        String   @id @default(cuid())
+  source    String // Lorien | Defontana | Shopify | GA4 | Seed
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  status    String   @default("Running") // Running | Done | Failed
+  docsCount Int      @default(0)
+  message   String?
+}
+
+model SalesInvoice {
+  id          String   @id @default(cuid())
+  name        String // serie-num (FV-00001)
+  postingDate DateTime @default(now())
+  dueDate     DateTime?
+  currency    String   @default("CLP")
+  status      String   @default("Draft") // Draft | Submitted | Paid | Cancelled
+
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  netTotal   Decimal @default(0)
+  totalTax   Decimal @default(0)
+  grandTotal Decimal @default(0)
+
+  // Atribución de marketing (cruce Shopify + GA4)
+  utmSource    String?
+  utmMedium    String?
+  utmCampaign  String?
+  utmTerm      String?
+  utmContent   String?
+  sourceName   String? // web | pos | mobile_app
+  campaignId   String?
+  campaign     Campaign? @relation(fields: [campaignId], references: [id])
+
+  createdByUserId String?
+  createdBy       User?   @relation(fields: [createdByUserId], references: [id])
+
+  items    SalesInvoiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, customerId])
+  @@index([campaignId])
+}
+
+model SalesInvoiceItem {
+  id       String @id @default(cuid())
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id])
+  qty      Decimal @default(0)
+  rate     Decimal @default(0) // precio unitario
+  amount   Decimal @default(0) // qty * rate
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  invoiceId String
+  invoice   SalesInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([itemId])
+}
+
+// -------------------- Compras --------------------
+
+model PurchaseInvoice {
+  id          String   @id @default(cuid())
+  name        String // serie-num (OC-00001)
+  postingDate DateTime @default(now())
+  dueDate     DateTime?
+  currency    String   @default("CLP")
+  status      String   @default("Draft") // Draft | Submitted | Paid | Cancelled
+
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  netTotal   Decimal @default(0)
+  totalTax   Decimal @default(0)
+  grandTotal Decimal @default(0)
+
+  createdByUserId String?
+  createdBy       User?   @relation(fields: [createdByUserId], references: [id])
+
+  items    PurchaseInvoiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, supplierId])
+}
+
+model PurchaseInvoiceItem {
+  id       String @id @default(cuid())
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id])
+  qty      Decimal @default(0)
+  rate     Decimal @default(0)
+  amount   Decimal @default(0)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  invoiceId String
+  invoice   PurchaseInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([itemId])
+}
+
+// Impuestos de documento (compartido por ventas y compras — referencia polimórfica)
+model InvoiceTax {
+  id            String @id @default(cuid())
+  documentType  String // "SalesInvoice" | "PurchaseInvoice"
+  documentId    String
+  taxTemplateId String
+  taxTemplate   TaxTemplate @relation(fields: [taxTemplateId], references: [id])
+  rate          Decimal @default(0)
+  amount        Decimal @default(0)
+
+  @@index([documentType, documentId])
+}
+
+// -------------------- Inventario (valorización FIFO) --------------------
+
+model StockLedgerEntry {
+  id            String  @id @default(cuid())
+  postingDate   DateTime @default(now())
+  itemId        String
+  item          Item      @relation(fields: [itemId], references: [id])
+  warehouseId   String
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  actualQty     Decimal   @default(0) // + entradas, - salidas
+  valuationRate Decimal   @default(0) // costo unitario
+  stockValue    Decimal   @default(0) // actualQty * valuationRate
+  balanceQty    Decimal   @default(0)
+  balanceValue  Decimal   @default(0)
+  voucherType   String
+  voucherNo     String
+  isCancelled   Boolean   @default(false)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([itemId, warehouseId])
+  @@index([companyId, voucherType, voucherNo])
+}
+
+// -------------------- Trello interno (Tareas / Kanban) --------------------
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  board       String       @default("General")
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  orderIndex  Int          @default(0)
+  dueDate     DateTime?
+  assigneeId  String?
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById String?
+  createdBy   User?        @relation("TaskCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([board, status])
+}
+
+// -------------------- Permisos por módulo --------------------
+
+model UserModulePermission {
+  id      String  @id @default(cuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module  String // ventas|compras|inventario|finanzas|campanas|tareas|contabilidad|reportes|admin|carritos
+  canView Boolean @default(false)
+  canEdit Boolean @default(false)
+
+  @@unique([userId, module])
+  @@index([userId])
+}
+
+model AbandonedCart {
+  id              String   @id @default(cuid())
+  shopifyCartId   String?  @unique
+  customerName    String?
+  email           String?
+  phone           String?
+  items           Json? // [{ itemCode, itemName, qty, price }]
+  total           Decimal  @default(0)
+  abandonedAt     DateTime @default(now())
+  status          String   @default("Pendiente") // Pendiente | Contactado | Recuperado | Perdido
+  shopDomain      String?
+  source          String   @default("Shopify")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, abandonedAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String // create | update | delete | login | perm_change
+  entityType String // User | Item | SalesInvoice | Campaign | etc.
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  source     String   @default("Manual") // Manual | Lorien | Defontana | Shopify | Sheets
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
