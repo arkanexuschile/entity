@@ -106,19 +106,37 @@ async function shopifyFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function shopifyFetchRaw(path: string) {
+  const token = getShopifyToken();
+  if (!token) throw new Error("SHOPIFY_ADMIN_TOKEN no configurado — conecta la app con Shopify.");
+  const res = await fetch(`${baseUrl()}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": token,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Shopify API ${res.status}: ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as Record<string, unknown>;
+  const link = res.headers.get("Link") ?? "";
+  const m = link.match(/page_info=([^&>]+)>;\s*rel="next"/);
+  return { data, nextPageInfo: m ? m[1] : null };
+}
+
 async function fetchAll<T>(path: (pageInfo: string | null) => string): Promise<T[]> {
   const out: T[] = [];
   let pageInfo: string | null = null;
   for (;;) {
-    const data: Record<string, unknown> = await shopifyFetch<Record<string, unknown>>(path(pageInfo));
+    const { data, nextPageInfo } = await shopifyFetchRaw(path(pageInfo));
     const listKey = Object.keys(data).find((k) => Array.isArray(data[k]));
     if (!listKey) break;
     const list = data[listKey] as T[];
     out.push(...list);
-    const info = data["page_info"];
-    if (typeof info === "string") pageInfo = info;
-    else break;
-    if (out.length > 10000) break;
+    pageInfo = nextPageInfo;
+    if (!pageInfo) break;
+    if (out.length > 50000) break;
   }
   return out;
 }
@@ -169,7 +187,10 @@ interface ShopifyOrder {
   source_name: string | null;
   financial_status: string | null; // paid | pending | voided | refunded
   currency: string;
-  total_price: string;
+  subtotal_price: string; // neto sin IVA ni envío
+  total_tax: string; // IVA
+  total_price: string; // total final (neto + IVA + envío)
+  total_discounts: string;
 }
 
 interface ShopifyCheckout {
@@ -319,14 +340,13 @@ export async function syncPedidos() {
   try {
     const company = await prisma.company.findFirstOrThrow();
     const warehouse = await prisma.warehouse.findFirstOrThrow({ where: { companyId: company.id } });
-    const iva = await prisma.taxTemplate.findFirstOrThrow({ where: { companyId: company.id, isVat: true } });
-    const ivaRate = Number(iva.rate);
 
     const orders = await fetchAll<ShopifyOrder>((pageInfo) =>
       pageInfo ? `/orders.json?limit=250&status=any&page_info=${encodeURIComponent(pageInfo)}` : "/orders.json?limit=250&status=any"
     );
 
     let creadas = 0;
+    let actualizadas = 0;
     let omitidas = 0;
     let lineasSinItem = 0;
 
@@ -334,11 +354,8 @@ export async function syncPedidos() {
       const name = o.name;
       const existing = await prisma.salesInvoice.findUnique({
         where: { companyId_name: { companyId: company.id, name } },
+        include: { items: true },
       });
-      if (existing) {
-        omitidas += 1;
-        continue;
-      }
 
       if (!o.line_items || o.line_items.length === 0) {
         omitidas += 1;
@@ -354,36 +371,76 @@ export async function syncPedidos() {
       }
 
       const items: Array<{ itemId: string; qty: number; rate: number; amount: number; warehouseId: string }> = [];
-      let netTotal = 0;
+      let netoLineas = 0;
       for (const l of o.line_items) {
         const itemCode = l.sku ?? (l.variant_id ? `SHOP-${l.variant_id}` : null);
         if (!itemCode) {
           lineasSinItem += 1;
           continue;
         }
-        const item = await prisma.item.findUnique({
+        let item = await prisma.item.findUnique({
           where: { companyId_itemCode: { companyId: company.id, itemCode } },
         });
         if (!item) {
-          lineasSinItem += 1;
-          continue;
+          // Ítem no está en el catálogo: lo creamos al vuelo con los datos del pedido
+          // para no perder ingresos ni la línea de venta.
+          item = await prisma.item.create({
+            data: {
+              itemCode,
+              itemName: l.title || `Item ${itemCode}`,
+              standardRate: Number(l.price),
+              valuationMethod: "FIFO",
+              companyId: company.id,
+            },
+          });
         }
         const qty = l.quantity;
         const rate = Number(l.price);
         const amount = qty * rate;
-        netTotal += amount;
+        netoLineas += amount;
         items.push({ itemId: item.id, qty, rate, amount, warehouseId: warehouse.id });
       }
 
-      if (items.length === 0) {
-        omitidas += 1;
+      // Totales reales de Shopify (fuente de verdad del ingreso)
+      const netTotal = Number(o.subtotal_price ?? netoLineas);
+      const totalTax = Number(o.total_tax ?? 0);
+      const grandTotal = Number(o.total_price ?? netTotal + totalTax);
+      const status = o.financial_status === "paid" ? "Paid" : "Pending";
+
+      if (existing) {
+        // Re-sync: corregir totales y estado de una factura ya ingerida
+        await prisma.salesInvoice.update({
+          where: { id: existing.id },
+          data: {
+            netTotal,
+            totalTax,
+            grandTotal,
+            status,
+            postingDate: new Date(o.created_at),
+            utmSource: utm?.source,
+            utmMedium: utm?.medium,
+            utmCampaign: utm?.campaign,
+            utmTerm: utm?.term,
+            utmContent: utm?.content,
+            sourceName: o.source_name ?? "web",
+            campaignId,
+          },
+        });
+        if (items.length > 0 && existing.items.length === 0) {
+          await prisma.salesInvoiceItem.createMany({
+            data: items.map((i) => ({
+              invoiceId: existing.id,
+              itemId: i.itemId,
+              qty: i.qty,
+              rate: i.rate,
+              amount: i.amount,
+              warehouseId: i.warehouseId,
+            })),
+          });
+        }
+        actualizadas += 1;
         continue;
       }
-
-      // Shopify envía totales sin IVA desglosado: reconstruimos con la tasa del template.
-      const status = o.financial_status === "paid" ? "Paid" : "Pending";
-      const totalTax = netTotal * (ivaRate / 100);
-      const grandTotal = netTotal + totalTax;
 
       await prisma.salesInvoice.create({
         data: {
@@ -440,9 +497,9 @@ export async function syncPedidos() {
       creadas += 1;
     }
 
-    const msg = `${orders.length} pedidos, ${creadas} facturas creadas, ${omitidas} omitidas (ya existían/sin líneas)${lineasSinItem ? `, ${lineasSinItem} líneas sin ítem en catálogo` : ""}.`;
-    await prisma.ingestLog.update({ where: { id: log.id }, data: { status: "Done", docsCount: creadas, message: msg, finishedAt: new Date() } });
-    return { source: "Shopify", count: creadas, omitidas, lineasSinItem, message: msg };
+    const msg = `${orders.length} pedidos, ${creadas} facturas creadas, ${actualizadas} actualizadas, ${omitidas} omitidas (sin líneas)${lineasSinItem ? `, ${lineasSinItem} líneas sin SKU` : ""}.`;
+    await prisma.ingestLog.update({ where: { id: log.id }, data: { status: "Done", docsCount: creadas + actualizadas, message: msg, finishedAt: new Date() } });
+    return { source: "Shopify", count: creadas, actualizadas, omitidas, lineasSinItem, message: msg };
   } catch (e) {
     await prisma.ingestLog.update({
       where: { id: log.id },
