@@ -5,7 +5,8 @@ Entity vive en su propio subdominio: `entity.piedrabruja.cl`. El dominio raíz `
 ## Requisitos del Droplet
 
 - Ubuntu 22.04+ (recomendado)
-- Node 22 exacto (via nvm)
+- Node 22
+- Docker + docker compose (para PostgreSQL)
 - Nginx
 - Let's Encrypt (certbot)
 - systemd
@@ -13,12 +14,17 @@ Entity vive en su propio subdominio: `entity.piedrabruja.cl`. El dominio raíz `
 ## 1. Configuración inicial del Droplet
 
 ```bash
-# Instalar nvm y Node 22
+# Node 22 (vía apt o nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 source ~/.bashrc
 nvm install 22
 nvm use 22
 nvm alias default 22
+
+# Docker (para PostgreSQL local)
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-v2
+sudo systemctl enable --now docker
 
 # Verificar
 node -v  # v22.x.x
@@ -61,7 +67,7 @@ SHOPIFY_SHOP_DOMAIN=<tienda.myshopify.com>
 SHOPIFY_ADMIN_TOKEN=<token de Admin API>
 
 # Puerto
-PORT=3001
+PORT=3003
 ```
 
 ## 4. Build y migraciones
@@ -83,12 +89,13 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-WorkingDirectory=/var/www/entity
-ExecStart=/home/<usuario>/.nvm/versions/node/v22.x.x/bin/react-router-serve ./build/server/index.js
-Restart=on-failure
+WorkingDirectory=/var/www/entity/apps/web
+ExecStart=/var/www/entity/apps/web/node_modules/.bin/react-router-serve /var/www/entity/apps/web/build/server/index.js
+Restart=always
+RestartSec=5
 Environment=NODE_ENV=production
-Environment=PORT=3001
+EnvironmentFile=/var/www/entity/apps/web/.env
+Environment=PORT=3003
 
 [Install]
 WantedBy=multi-user.target
@@ -113,7 +120,14 @@ sudo certbot --nginx -d entity.piedrabruja.cl
 
 ## 7. Despliegue de actualizaciones
 
-El despliegue se hace desde `main`:
+El despliegue se hace desde `main`. El repo trae un script que hace todo (pull, install, build, migraciones, backup y reinicio):
+
+```bash
+cd /var/www/entity
+bash deploy.sh
+```
+
+Si prefieres manual:
 
 ```bash
 cd /var/www/entity
