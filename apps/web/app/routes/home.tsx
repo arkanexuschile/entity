@@ -1,15 +1,36 @@
-import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { useLoaderData, useSearchParams } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
+import { Form, useActionData, useLoaderData, useSearchParams } from "react-router";
 import { prisma } from "@entity/database";
 import { requireUser } from "../lib/auth.server";
 import { FlameIcon, GemIcon, ScalesIcon, ScrollIcon, ShieldIcon, SwordIcon } from "../components/icons";
 import { resumenFinanzas } from "../lib/finanzas";
 import { analisisCampanas, recomendar, fmt } from "../lib/campanas";
+import { isShopifyConfigured, syncShopifyTodo } from "../lib/shopify.server";
 
 export const meta: MetaFunction = () => [
   { title: "Salón del Gremio · Entity" },
   { name: "description", content: "Hub operativo de Entity — ERP en Remix/Node" },
 ];
+
+export async function action({ request }: ActionFunctionArgs) {
+  await requireUser(request);
+  const form = await request.formData();
+  const intent = form.get("intent");
+
+  if (intent === "sync-shopify") {
+    if (!isShopifyConfigured()) {
+      return { shopify: { ok: false as const, error: "Shopify no configurado — falta SHOPIFY_SHOP_DOMAIN o SHOPIFY_ADMIN_TOKEN en .env" } };
+    }
+    try {
+      const resultados = await syncShopifyTodo();
+      return { shopify: { ok: true as const, ...resultados } };
+    } catch (e) {
+      return { shopify: { ok: false as const, error: e instanceof Error ? e.message : String(e) } };
+    }
+  }
+
+  return { shopify: null };
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await requireUser(request);
@@ -44,7 +65,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     ? { source: "Resend", status: "Done", startedAt: new Date(), docsCount: 0, message: `Remitente ${process.env.RESEND_FROM}` } as unknown as (typeof logs)[number]
     : undefined;
 
-  return { company, accounts, items, tasks, warehouses, resumen, recomendaciones, health: { logs, bySource, resendConfigured, resendLog }, filters: { from, to } };
+  return { company, accounts, items, tasks, warehouses, resumen, recomendaciones, health: { logs, bySource, resendConfigured, resendLog }, shopifyConfigured: isShopifyConfigured(), filters: { from, to } };
 }
 
 const statusLabel: Record<string, string> = {
@@ -73,7 +94,9 @@ const miniBtn: React.CSSProperties = { background: "none", border: "1px solid va
 
 export default function Home() {
   const data = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const [params, setParams] = useSearchParams();
+  const shopifyResult = actionData?.shopify;
 
   const tiles = [
     { icon: ScalesIcon, value: money.format(data.resumen.ingresos), label: "Ingresos" },
@@ -115,6 +138,33 @@ export default function Home() {
           <p className="page-sub">
             Bienvenido, {data.company?.name ?? "PiedraBruja"} — el reino prospera bajo tu signo.
           </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "flex-end" }}>
+          <Form method="post">
+            <input type="hidden" name="intent" value="sync-shopify" />
+            <button
+              type="submit"
+              disabled={!data.shopifyConfigured}
+              title={data.shopifyConfigured ? "Sincronizar productos, pedidos y carritos desde Shopify" : "Configura SHOPIFY_SHOP_DOMAIN y SHOPIFY_ADMIN_TOKEN en .env"}
+              style={{
+                ...miniBtn,
+                background: data.shopifyConfigured ? "var(--orange)" : "rgba(234,88,12,0.25)",
+                color: data.shopifyConfigured ? "#fff" : "var(--faint)",
+                border: "none",
+                alignSelf: "flex-end",
+              }}
+            >
+              Sincronizar Shopify
+            </button>
+          </Form>
+          {shopifyResult && shopifyResult.ok && (
+            <div style={{ fontSize: "0.72rem", color: "var(--gold-soft)", maxWidth: 340, textAlign: "right" }}>
+              Productos: {shopifyResult.productos?.message} · Pedidos: {shopifyResult.pedidos?.message} · Carritos: {shopifyResult.carritos?.message}
+            </div>
+          )}
+          {shopifyResult && !shopifyResult.ok && (
+            <div style={{ fontSize: "0.72rem", color: "var(--danger)", maxWidth: 340, textAlign: "right" }}>{shopifyResult.error}</div>
+          )}
         </div>
       </header>
 
