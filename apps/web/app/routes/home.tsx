@@ -5,7 +5,7 @@ import { requireUser } from "../lib/auth.server";
 import { FlameIcon, GemIcon, ScalesIcon, ScrollIcon, ShieldIcon, SwordIcon } from "../components/icons";
 import { resumenFinanzas } from "../lib/finanzas";
 import { analisisCampanas, recomendar, fmt } from "../lib/campanas";
-import { isShopifyConfigured, syncShopifyTodo } from "../lib/shopify.server";
+import { isShopifyConfigured, isShopifyInstalled, syncShopifyTodo } from "../lib/shopify.server";
 
 export const meta: MetaFunction = () => [
   { title: "Salón del Gremio · Entity" },
@@ -19,7 +19,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === "sync-shopify") {
     if (!isShopifyConfigured()) {
-      return { shopify: { ok: false as const, error: "Shopify no configurado — falta SHOPIFY_SHOP_DOMAIN o SHOPIFY_ADMIN_TOKEN en .env" } };
+      return { shopify: { ok: false as const, error: "Shopify no está conectado — conecta la app antes de sincronizar." } };
     }
     try {
       const resultados = await syncShopifyTodo();
@@ -65,7 +65,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     ? { source: "Resend", status: "Done", startedAt: new Date(), docsCount: 0, message: `Remitente ${process.env.RESEND_FROM}` } as unknown as (typeof logs)[number]
     : undefined;
 
-  return { company, accounts, items, tasks, warehouses, resumen, recomendaciones, health: { logs, bySource, resendConfigured, resendLog }, shopifyConfigured: isShopifyConfigured(), filters: { from, to } };
+  const shopifyMessage = url.searchParams.get("shopify") ?? "";
+
+  return { company, accounts, items, tasks, warehouses, resumen, recomendaciones, health: { logs, bySource, resendConfigured, resendLog }, shopifyInstalled: isShopifyInstalled(), shopifyConfigured: isShopifyConfigured(), shopifyMessage, filters: { from, to } };
 }
 
 const statusLabel: Record<string, string> = {
@@ -140,23 +142,54 @@ export default function Home() {
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "flex-end" }}>
-          <Form method="post">
-            <input type="hidden" name="intent" value="sync-shopify" />
-            <button
-              type="submit"
-              disabled={!data.shopifyConfigured}
-              title={data.shopifyConfigured ? "Sincronizar productos, pedidos y carritos desde Shopify" : "Configura SHOPIFY_SHOP_DOMAIN y SHOPIFY_ADMIN_TOKEN en .env"}
-              style={{
-                ...miniBtn,
-                background: data.shopifyConfigured ? "var(--orange)" : "rgba(234,88,12,0.25)",
-                color: data.shopifyConfigured ? "#fff" : "var(--faint)",
-                border: "none",
-                alignSelf: "flex-end",
-              }}
-            >
-              Sincronizar Shopify
-            </button>
-          </Form>
+          {!data.shopifyInstalled ? (
+            <>
+              <a
+                href="/api/shopify/auth"
+                title="Autoriza la app en tu tienda para empezar a traer datos"
+                style={{
+                  ...miniBtn,
+                  background: "var(--orange)",
+                  color: "#fff",
+                  border: "none",
+                  alignSelf: "flex-end",
+                  textDecoration: "none",
+                }}
+              >
+                Conectar con Shopify
+              </a>
+              {data.shopifyMessage && (
+                <div style={{ fontSize: "0.72rem", color: "var(--danger)", maxWidth: 340, textAlign: "right" }}>
+                  {data.shopifyMessage.startsWith("error") ? `No se pudo conectar: ${data.shopifyMessage.slice(6)}` : data.shopifyMessage}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <Form method="post">
+                <input type="hidden" name="intent" value="sync-shopify" />
+                <button
+                  type="submit"
+                  disabled={!data.shopifyConfigured}
+                  title={data.shopifyConfigured ? "Sincronizar productos, pedidos y carritos desde Shopify" : "Shopify necesita configuración adicional"}
+                  style={{
+                    ...miniBtn,
+                    background: data.shopifyConfigured ? "var(--orange)" : "rgba(234,88,12,0.25)",
+                    color: data.shopifyConfigured ? "#fff" : "var(--faint)",
+                    border: "none",
+                    alignSelf: "flex-end",
+                  }}
+                >
+                  Sincronizar Shopify
+                </button>
+              </Form>
+              {data.shopifyMessage && (
+                <div style={{ fontSize: "0.72rem", color: data.shopifyMessage === "ok" ? "var(--gold-soft)" : "var(--danger)", maxWidth: 340, textAlign: "right" }}>
+                  {data.shopifyMessage === "ok" ? "Tienda conectada correctamente." : `No se pudo conectar: ${data.shopifyMessage.slice(6)}`}
+                </div>
+              )}
+            </>
+          )}
           {shopifyResult && shopifyResult.ok && (
             <div style={{ fontSize: "0.72rem", color: "var(--gold-soft)", maxWidth: 340, textAlign: "right" }}>
               Productos: {shopifyResult.productos?.message} · Pedidos: {shopifyResult.pedidos?.message} · Carritos: {shopifyResult.carritos?.message}

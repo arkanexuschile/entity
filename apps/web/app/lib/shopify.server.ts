@@ -1,29 +1,98 @@
 import { prisma } from "@entity/database";
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
 
 // ============================================================
 // CLIENTE SHOPIFY — custom app de la tienda (Admin API).
 // Fuente del pipeline: pedidos (SalesInvoice), catálogo (Item),
 // carritos abandonados (AbandonedCart).
-// Requiere en .env: SHOPIFY_SHOP_DOMAIN, SHOPIFY_ADMIN_TOKEN.
+// Requiere en .env: SHOPIFY_SHOP_DOMAIN, SHOPIFY_CLIENT_ID,
+// SHOPIFY_CLIENT_SECRET. El token se obtiene por OAuth y se
+// guarda en un archivo local (gitignored).
 // Scopes Admin API: read_products, read_orders, read_customers,
 // read_checkouts.
 // ============================================================
 
 const API_VERSION = "2024-10";
+const SCOPES = "read_products,read_orders,read_customers,read_checkouts";
+const TOKEN_FILE = path.join(process.cwd(), ".shopify-auth.json");
+
+function getStoredToken(): string | undefined {
+  try {
+    if (!fs.existsSync(TOKEN_FILE)) return undefined;
+    const raw = JSON.parse(fs.readFileSync(TOKEN_FILE, "utf8"));
+    return typeof raw?.accessToken === "string" ? raw.accessToken : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveShopifyToken(accessToken: string, shop: string) {
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ accessToken, shop, savedAt: new Date().toISOString() }, null, 2));
+}
+
+function getShopifyToken(): string | undefined {
+  return process.env.SHOPIFY_ADMIN_TOKEN || getStoredToken();
+}
+
+function getShopDomain(): string | undefined {
+  return process.env.SHOPIFY_SHOP_DOMAIN?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
 
 export function isShopifyConfigured() {
-  return Boolean(process.env.SHOPIFY_SHOP_DOMAIN && process.env.SHOPIFY_ADMIN_TOKEN);
+  return Boolean(getShopDomain() && process.env.SHOPIFY_CLIENT_ID && process.env.SHOPIFY_CLIENT_SECRET && getShopifyToken());
+}
+
+export function isShopifyInstalled() {
+  return Boolean(getShopDomain() && getShopifyToken());
+}
+
+export function shopifyAuthUrl(state: string, redirectUri: string) {
+  const shop = getShopDomain();
+  const clientId = process.env.SHOPIFY_CLIENT_ID;
+  if (!shop || !clientId) throw new Error("Shopify no configurado: faltan SHOPIFY_SHOP_DOMAIN o SHOPIFY_CLIENT_ID.");
+  const params = new URLSearchParams({
+    client_id: clientId,
+    scope: SCOPES,
+    redirect_uri: redirectUri,
+    state,
+    "grant_options[]": "per-user",
+  });
+  return `https://${shop}/admin/oauth/authorize?${params.toString()}`;
+}
+
+export async function exchangeShopifyCode(shop: string, code: string): Promise<string> {
+  const clientId = process.env.SHOPIFY_CLIENT_ID;
+  const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("Faltan SHOPIFY_CLIENT_ID o SHOPIFY_CLIENT_SECRET.");
+  const res = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Shopify OAuth token exchange falló (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as { access_token?: string };
+  if (!data.access_token) throw new Error("Shopify OAuth no devolvió access_token.");
+  return data.access_token;
+}
+
+export function newOAuthState(): string {
+  return crypto.randomBytes(24).toString("hex");
 }
 
 function baseUrl() {
-  const shop = process.env.SHOPIFY_SHOP_DOMAIN?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const shop = getShopDomain();
   if (!shop) throw new Error("SHOPIFY_SHOP_DOMAIN no configurado.");
   return `https://${shop}/admin/api/${API_VERSION}`;
 }
 
 async function shopifyFetch<T>(path: string): Promise<T> {
-  const token = process.env.SHOPIFY_ADMIN_TOKEN;
-  if (!token) throw new Error("SHOPIFY_ADMIN_TOKEN no configurado.");
+  const token = getShopifyToken();
+  if (!token) throw new Error("SHOPIFY_ADMIN_TOKEN no configurado — conecta la app con Shopify.");
   const res = await fetch(`${baseUrl()}${path}`, {
     headers: {
       "Content-Type": "application/json",
