@@ -1,5 +1,7 @@
 # Instructivo de Despliegue — Entity
 
+Entity vive en su propio subdominio: `entity.piedrabruja.cl`. El dominio raíz `piedrabruja.cl` es la tienda/sitio público, así que Entity no va ahí.
+
 ## Requisitos del Droplet
 
 - Ubuntu 22.04+ (recomendado)
@@ -48,11 +50,11 @@ DATABASE_URL=postgresql://entity:entity@localhost:5435/entity
 SESSION_SECRET=<generar string aleatorio largo>
 
 # URL pública de la app (para enlaces en correos)
-APP_BASE_URL=https://piedrabruja.cl
+APP_BASE_URL=https://entity.piedrabruja.cl
 
 # Resend (notificaciones por correo) — opcional
 RESEND_API_KEY=
-RESEND_FROM=Entity <noreply@piedrabruja.cl>
+RESEND_FROM=Entity <noreply@entity.piedrabruja.cl>
 
 # Shopify (custom app de la tienda) — ver sección 9
 SHOPIFY_SHOP_DOMAIN=<tienda.myshopify.com>
@@ -106,7 +108,7 @@ sudo apt install certbot python3-certbot-nginx
 
 # Configurar Nginx (ver block de configuración)
 # Luego:
-sudo certbot --nginx -d piedrabruja.cl
+sudo certbot --nginx -d entity.piedrabruja.cl
 ```
 
 ## 7. Despliegue de actualizaciones

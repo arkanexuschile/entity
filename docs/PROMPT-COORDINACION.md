@@ -6,7 +6,7 @@
 
 ## Contexto — Proyecto Entity (PiedraBruja)
 
-Estás colaborando en **Entity**, la plataforma central (ERP) de PiedraBruja (tienda de juegos de mesa/hobby en Shopify): ventas, compras, inventario, finanzas y operación del gremio. Entity vive **fuera de Shopify**, corre en un Droplet propio (`piedrabruja.cl`). Stack: React Router v7 en modo framework, React 19, Vite, Node 22, PostgreSQL 16 con Prisma ORM, pnpm + Turborepo, systemd, Nginx + Let's Encrypt. **Un solo repositorio Git monorepo, compartido por todos los módulos.**
+Estás colaborando en **Entity**, la plataforma central (ERP) de PiedraBruja (tienda de juegos de mesa/hobby en Shopify): ventas, compras, inventario, finanzas y operación del gremio. Entity vive **fuera de Shopify**, corre en un Droplet propio (`entity.piedrabruja.cl`; el dominio raíz `piedrabruja.cl` es la tienda pública). Stack: React Router v7 en modo framework, React 19, Vite, Node 22, PostgreSQL 16 con Prisma ORM, pnpm + Turborepo, systemd, Nginx + Let's Encrypt. **Un solo repositorio Git monorepo, compartido por todos los módulos.**
 
 Antes de escribir código, lee completos estos documentos (el usuario te los debe haber pasado):
 
