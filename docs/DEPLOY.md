@@ -54,6 +54,10 @@ APP_BASE_URL=https://entity.piedrabruja.cl
 RESEND_API_KEY=
 RESEND_FROM=Entity <noreply@entity.piedrabruja.cl>
 
+# Shopify (custom app de la tienda) — ver sección 9
+SHOPIFY_SHOP_DOMAIN=<tienda.myshopify.com>
+SHOPIFY_ADMIN_TOKEN=<token de Admin API>
+
 # Puerto
 PORT=3001
 ```
@@ -107,7 +111,7 @@ sudo certbot --nginx -d entity.piedrabruja.cl
 
 ## 7. Despliegue de actualizaciones
 
-Solo Noe, solo desde `main`:
+El despliegue se hace desde `main`:
 
 ```bash
 cd /var/www/entity
@@ -135,13 +139,13 @@ DATABASE_URL=postgresql://entity:entity@localhost:5435/entity
 
 Entity necesita una **custom app** en el admin de la tienda para acceder a la Admin API:
 
-1. Ir a **Settings → Apps and sales channels → Develop apps**
-2. Crear app "Entity"
-3. Configurar scopes: `read_products`, `write_products`, `read_orders`, `read_collections`
-4. Instalar y copiar el **Admin API access token**
-5. Agregar `SHOPIFY_SHOP_DOMAIN` y `SHOPIFY_ADMIN_TOKEN` al `.env`
+1. Ir a **Settings → Apps and sales channels → Develop apps** (o usar el Dev Dashboard de Shopify).
+2. Crear app "Entity".
+3. Configurar scopes: `read_products`, `read_orders`, `read_customers`, `read_checkouts`.
+4. Instalar y copiar el **Admin API access token**.
+5. Agregar `SHOPIFY_SHOP_DOMAIN` y `SHOPIFY_ADMIN_TOKEN` al `.env`.
 
-**Nota:** la custom app NO es una app pública. Es solo la forma que Shopify tiene de generar credenciales de API para una tienda.
+**Nota:** los scopes son de solo lectura; la app no modifica datos de la tienda.
 
 ## 10. Login de usuarios
 
