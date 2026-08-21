@@ -342,7 +342,7 @@ export async function syncPedidos() {
     const warehouse = await prisma.warehouse.findFirstOrThrow({ where: { companyId: company.id } });
 
     const orders = await fetchAll<ShopifyOrder>((pageInfo) =>
-      pageInfo ? `/orders.json?limit=250&status=any&page_info=${encodeURIComponent(pageInfo)}` : "/orders.json?limit=250&status=any"
+      pageInfo ? `/orders.json?limit=250&page_info=${encodeURIComponent(pageInfo)}` : "/orders.json?limit=250&status=any"
     );
 
     let creadas = 0;
@@ -517,7 +517,7 @@ export async function syncCarritos() {
   const log = await prisma.ingestLog.create({ data: { source: "Shopify" } });
   try {
     const checkouts = await fetchAll<ShopifyCheckout>((pageInfo) =>
-      pageInfo ? `/checkouts.json?limit=250&status=open&page_info=${encodeURIComponent(pageInfo)}` : "/checkouts.json?limit=250&status=open"
+      pageInfo ? `/checkouts.json?limit=250&page_info=${encodeURIComponent(pageInfo)}` : "/checkouts.json?limit=250&status=open"
     );
 
     let creados = 0;
