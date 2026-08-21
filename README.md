@@ -55,6 +55,7 @@ pnpm db:seed        # Cargar datos de demostración
 ## Documentación
 
 - [`docs/SETUP.md`](docs/SETUP.md) — guía de instalación paso a paso.
+- [`docs/GUIA-GIT.md`](docs/GUIA-GIT.md) — cómo trabajar con ramas y Pull Requests.
 - [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) — cómo está construido el proyecto.
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — cómo se publica en el servidor.
 - [`docs/PROMPT-COORDINACION.md`](docs/PROMPT-COORDINACION.md) — guía de trabajo en equipo sobre el repositorio.

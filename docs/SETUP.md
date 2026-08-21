@@ -68,6 +68,46 @@ Debe aparecer un número (por ejemplo `11.17.0`).
 
 > Verifica que Docker quedó funcionando: en la Terminal escribe `docker --version`. Debe mostrar un número.
 
+#### 2.3.1 Windows: habilitar WSL 2 paso a paso
+
+En computadores con Windows, Docker Desktop usa WSL 2 para funcionar. Si al abrir Docker aparece el aviso **"Virtualization support not detected"** o **"WSL 2 installation is incomplete"**, es porque faltan activar componentes de Windows. Esto se arregla así:
+
+1. Abre la **Terminal como administrador**:
+   - Escribe `PowerShell` en el menú de inicio.
+   - Haz clic derecho sobre "Windows PowerShell" → **Ejecutar como administrador**.
+2. Pega estos comandos **uno por uno** (presiona Enter después de cada uno):
+
+   ```bash
+   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -All -NoRestart
+   Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -All -NoRestart
+   Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All -NoRestart
+   ```
+
+   Cada uno mostrará un mensaje. Si dice `RestartNeeded : True`, es normal: hay que reiniciar.
+
+3. **Reinicia el computador.**
+4. Después de reiniciar, vuelve a abrir la Terminal (puede ser normal, no hace falta admin) y actualiza el sistema WSL:
+
+   ```bash
+   wsl --update
+   ```
+
+   Debe mostrar algo como "Se ha instalado el Subsistema de Windows para Linux".
+
+5. Verifica que WSL esté en versión 2:
+
+   ```bash
+   wsl --status
+   ```
+
+   Debe decir "Versión predeterminada: 2".
+
+6. Abre **Docker Desktop** de nuevo. Esta vez debe arrancar sin el aviso.
+
+> **¿Por qué pasa esto?** Windows trae "apagadas" unas funciones que permiten ejecutar programas de Linux dentro del computador. Docker las necesita. Los comandos de arriba solo las encienden — no borran nada ni afectan otros programas.
+
+> **Nota:** si el aviso dice "Virtualization support not detected" pero los pasos de arriba no lo resuelven, es posible que la **virtualización esté apagada en el BIOS** de la computadora. En ese caso hay que encenderla en el inicio del equipo (la tecla suele ser F2, F10 o Supr, depende de la marca). Busca en internet "<marca de tu computador> habilitar virtualización BIOS".
+
 ---
 
 ## 3. Descargar el proyecto
@@ -208,14 +248,11 @@ La base de datos no está corriendo. Revisa:
 
 ### "Docker no arranca / error de virtualización" (Windows)
 
-1. Revisa que la virtualización esté activa en el BIOS de tu computador (suele estar activa por defecto; si dudas, busca "<tu modelo> habilitar virtualización BIOS").
-2. Habilita las características de Windows necesarias: en la Terminal (como administrador) ejecuta:
+Es el problema más común en Windows. Sigue la sección [2.3.1 Windows: habilitar WSL 2 paso a paso](#231-windows-habilitar-wsl-2-paso-a-paso): activar las funciones de Windows, reiniciar, y actualizar WSL.
 
-   ```bash
-   wsl --install
-   ```
+### "fatal: could not read Username" / GitHub pide usuario y contraseña
 
-3. Reinicia el computador y abre Docker Desktop de nuevo.
+Al clonar, GitHub pide identificación. Usa tu cuenta de GitHub. Si es la primera vez, es normal que pida usuario y contraseña (o un token). Para evitar repetirlo, sigue la [guía de Git](GUIA-GIT.md).
 
 ### "Command not found: pnpm" / "pnpm no se reconoce"
 
@@ -231,4 +268,5 @@ Si el navegador muestra algo raro, recarga con `Ctrl + Shift + R` (recarga forza
 
 - Para entender cómo está construido el proyecto: [`ARQUITECTURA.md`](ARQUITECTURA.md).
 - Para saber cómo se conecta con Shopify y otros servicios: sección "Integraciones" en la arquitectura.
+- Para trabajar con ramas y Pull Requests: [`GUIA-GIT.md`](GUIA-GIT.md).
 - Para ver cómo se publica en el servidor: [`DEPLOY.md`](DEPLOY.md).
